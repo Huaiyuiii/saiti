@@ -51,18 +51,26 @@
 #define MENU_REFRESH_MS         100
 
 /* -------------------- 5. 循迹传感器（8 路）-------------------- */
-#define TRACK_PORT              GPIOA
+/* 模块只支持 5V 供电，输出信号也是 5V。
+ * PA0~PA7 是 TTa 类型，不承受 5V，所以改用 GPIOB 的 PB8~PB15，
+ * 这 8 个脚是 FT（5V 容忍），可以直接接 5V 信号。
+ * 引脚方向在 Track_Init() 里自己配置，不依赖 CubeMX 生成。 */
+#define TRACK_PORT              GPIOB
 
-/* 8 路引脚，顺序 = 从左到右 X1~X8，都在 GPIOA。
- * 方向已在 MX_GPIO_Init() 里配成「输入 + 上拉」，不需要重复配置 */
-#define TRACK_PIN_LIST          { GPIO_PIN_0, GPIO_PIN_1, GPIO_PIN_2, GPIO_PIN_3, \
-                                  GPIO_PIN_4, GPIO_PIN_5, GPIO_PIN_6, GPIO_PIN_7 }
+/* 8 路引脚，顺序 = 从左到右 X1~X8 */
+#define TRACK_PIN_LIST          { GPIO_PIN_8,  GPIO_PIN_9,  GPIO_PIN_10, GPIO_PIN_11, \
+                                  GPIO_PIN_12, GPIO_PIN_13, GPIO_PIN_14, GPIO_PIN_15 }
 
 /* 1 = 检测到黑线时该路输出高电平（多数模块默认）
  * 0 = 检测到黑线时输出低电平
  * 判断方法：进 LINE 页面，把车放在白纸上应该全是 0；
  * 把某个探头压到黑线上，对应位变 1 就是对的。如果正好相反，把这里改成 0 */
 #define TRACK_ACTIVE_HIGH       1
+
+/* 1 = 把偏差的正负号反过来。
+ * 如果实测发现「车偏左时 ERR 显示正数」，说明模块装的方向和代码假设相反，
+ * 把这个改成 1 即可，不用重新接线 */
+#define TRACK_REVERSE           0
 
 /* -------------------- 6. 个人信息（3a 要显示，改成你自己的）-------------------- */
 /* ⚠️ 把下面一串 0 换成你的真学号，否则 3a 那 1 分拿不到 */

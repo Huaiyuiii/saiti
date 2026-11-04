@@ -29,9 +29,23 @@ static uint8_t track_read_one(uint8_t ch)
 
 void Track_Init(void)
 {
-    /* 引脚方向在 MX_GPIO_Init() 里已经配成输入上拉，这里不用重复配置，
-     * 只读一次让内部状态有个初值 */
-    (void)Track_ReadMask();
+    GPIO_InitTypeDef gi = {0};
+    uint16_t pins = 0;
+    uint8_t i;
+
+    /* 引脚方向在这里自己配，不依赖 CubeMX 生成，
+     * 以后换引脚只改 app_config.h 里的 TRACK_PORT / TRACK_PIN_LIST */
+    for (i = 0; i < TRACK_CH_COUNT; i++)
+    {
+        pins |= s_pin[i];
+    }
+
+    gi.Pin  = pins;
+    gi.Mode = GPIO_MODE_INPUT;
+    gi.Pull = GPIO_PULLUP;      /* 模块没接时读高电平，不会乱跳 */
+    HAL_GPIO_Init(TRACK_PORT, &gi);
+
+    (void)Track_ReadMask();     /* 读一次，让内部状态有个初值 */
 }
 
 uint8_t Track_ReadMask(void)
@@ -56,6 +70,7 @@ int8_t Track_GetError(void)
     int16_t sum  = 0;
     uint8_t cnt  = 0;
     uint8_t i;
+    int8_t  err;
 
     for (i = 0; i < TRACK_CH_COUNT; i++)
     {
@@ -72,7 +87,13 @@ int8_t Track_GetError(void)
         return 0;           /* 一路都没压到，脱轨，由 Track_IsLost() 判断 */
     }
 
-    return (int8_t)(sum / (int16_t)cnt);
+    err = (int8_t)(sum / (int16_t)cnt);
+
+#if TRACK_REVERSE
+    err = (int8_t)(-err);   /* 模块装反了时用这个开关纠正符号 */
+#endif
+
+    return err;
 }
 
 uint8_t Track_IsLost(void)
