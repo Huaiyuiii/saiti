@@ -1,0 +1,235 @@
+/*
+ * menu.c - 多级菜单 + LED 子界面
+ *
+ * 赛题 1a：上电显示主菜单，箭头默认第一行，按键1/2 移动箭头，至少 4 个菜单项
+ * 赛题 1b：按键3 进入子菜单，按键4 返回主菜单
+ * 赛题 2a：LED 子界面里 按键1 → 两个灯 常灭↔常亮
+ * 赛题 2b：按键2 → 交替闪烁
+ * 赛题 2c：按键4 返回主菜单，同时两个灯变常灭
+ * 赛题 2d：子界面显示两个 LED 的真实亮灭状态
+ */
+
+#include "menu.h"
+#include "app_config.h"
+#include "led.h"
+#include "key.h"
+#include "oled.h"
+
+#define MENU_ITEM_COUNT     4
+
+/* 主菜单文字（字库只有 ASCII，所以用英文） */
+static const char *const s_item_text[MENU_ITEM_COUNT] =
+{
+    "LED",      /* 对应 PAGE_LED  */
+    "INFO",     /* 对应 PAGE_INFO */
+    "LINE",     /* 对应 PAGE_LINE */
+    "EXT"       /* 对应 PAGE_EXT  */
+};
+
+/* 8 路传感器都挂在 PA0~PA7，从左到右依次对应 */
+static const uint16_t s_sensor_pin[8] =
+{
+    GPIO_PIN_0, GPIO_PIN_1, GPIO_PIN_2, GPIO_PIN_3,
+    GPIO_PIN_4, GPIO_PIN_5, GPIO_PIN_6, GPIO_PIN_7
+};
+
+static PageId   s_page   = PAGE_MAIN;
+static uint8_t  s_cursor = 0;           /* 主菜单箭头所在行，上电指第一行 */
+static uint32_t s_draw_tick = 0;
+static uint8_t  s_dirty = 1;            /* 1 = 下一轮必须重画 */
+
+/* ---------------- 文字小工具 ---------------- */
+
+static const char *mode_text(LedMode m)
+{
+    switch (m)
+    {
+    case LED_MODE_ON:    return "ON";
+    case LED_MODE_BLINK: return "BLNK";
+    default:             return "OFF";
+    }
+}
+
+static const char *state_text(uint8_t on)
+{
+    return (on != 0) ? "ON " : "OFF";
+}
+
+/* ---------------- 各个页面 ---------------- */
+
+static void draw_main(void)
+{
+    uint8_t i;
+
+    OLED_Clear();
+    for (i = 0; i < MENU_ITEM_COUNT; i++)
+    {
+        uint8_t y = (uint8_t)(i * 16);
+        if (i == s_cursor)
+        {
+            OLED_ShowText(0, y, ">", 16);           /* 箭头 */
+        }
+        OLED_ShowText(16, y, s_item_text[i], 16);
+    }
+    OLED_Update();
+}
+
+static void draw_led(void)
+{
+    uint8_t red, green;
+
+    /* 直接读引脚，保证"显示 = 实际" */
+    red   = Led_IsRedOn();
+    green = Led_IsGreenOn();
+
+    OLED_Clear();
+    OLED_ShowText(0,  0,  "LED MODE:", 16);
+    OLED_ShowText(72, 0,  mode_text(Led_GetMode()), 16);
+
+    OLED_ShowText(0,  16, "RED  :", 16);
+    OLED_ShowText(48, 16, state_text(red), 16);
+
+    OLED_ShowText(0,  32, "GREEN:", 16);
+    OLED_ShowText(48, 32, state_text(green), 16);
+
+    OLED_ShowText(0,  48, "K1:ON/OFF K2:BLINK", 8);
+    OLED_ShowText(0,  56, "K4:BACK", 8);
+    OLED_Update();
+}
+
+static void draw_info(void)
+{
+    OLED_Clear();
+    OLED_ShowText(0, 0, "INFO", 16);
+
+    OLED_ShowText(0,  16, "NAME:", 8);
+    OLED_ShowText(36, 16, INFO_NAME, 8);
+
+    OLED_ShowText(0,  24, "ID:", 8);
+    OLED_ShowText(24, 24, INFO_STUDENT_ID, 8);
+
+    OLED_ShowText(0,  32, "A=", 8);
+    OLED_ShowNum(18, 32, 0, 4, 8);      /* 变量 a，初始值 0（3a） */
+
+    OLED_ShowText(0,  56, "K4:BACK", 8);
+    OLED_Update();
+}
+
+static void draw_line(void)
+{
+    char bits[9];
+    uint8_t i;
+
+    for (i = 0; i < 8; i++)
+    {
+        bits[i] = (HAL_GPIO_ReadPin(GPIOA, s_sensor_pin[i]) == GPIO_PIN_SET) ? '1' : '0';
+    }
+    bits[8] = '\0';
+
+    OLED_Clear();
+    OLED_ShowText(0, 0, "SENSOR", 16);
+    OLED_ShowText(0, 16, bits, 16);
+    OLED_ShowText(0, 32, "1=WHITE 0=BLACK", 8);
+    OLED_ShowText(0, 56, "K4:BACK", 8);
+    OLED_Update();
+}
+
+static void draw_ext(void)
+{
+    OLED_Clear();
+    OLED_ShowText(0, 0, "EXT", 16);
+    OLED_ShowText(0, 16, "6.1 RANDOM MAP", 8);
+    OLED_ShowText(0, 24, "6.2 PARAM SAVE", 8);
+    OLED_ShowText(0, 32, "6.3 BLUETOOTH", 8);
+    OLED_ShowText(0, 40, "6.4 SPEED", 8);
+    OLED_ShowText(0, 56, "K4:BACK", 8);
+    OLED_Update();
+}
+
+static void draw_page(void)
+{
+    switch (s_page)
+    {
+    case PAGE_LED:  draw_led();  break;
+    case PAGE_INFO: draw_info(); break;
+    case PAGE_LINE: draw_line(); break;
+    case PAGE_EXT:  draw_ext();  break;
+    case PAGE_MAIN:
+    default:        draw_main(); break;
+    }
+}
+
+/* ---------------- 按键处理 ---------------- */
+
+static void handle_key(uint8_t key)
+{
+    switch (s_page)
+    {
+    case PAGE_MAIN:
+        if (key == KEY_ID_1)            /* 上移，循环 */
+        {
+            s_cursor = (uint8_t)((s_cursor + MENU_ITEM_COUNT - 1) % MENU_ITEM_COUNT);
+        }
+        else if (key == KEY_ID_2)       /* 下移，循环 */
+        {
+            s_cursor = (uint8_t)((s_cursor + 1) % MENU_ITEM_COUNT);
+        }
+        else if (key == KEY_ID_3)       /* 进入子菜单 */
+        {
+            s_page = (PageId)(PAGE_LED + s_cursor);
+        }
+        break;
+
+    case PAGE_LED:
+        if (key == KEY_ID_1)            /* 2a：常灭 ↔ 常亮 */
+        {
+            Led_SetMode((Led_GetMode() == LED_MODE_ON) ? LED_MODE_OFF : LED_MODE_ON);
+        }
+        else if (key == KEY_ID_2)       /* 2b：交替闪烁 */
+        {
+            Led_SetMode(LED_MODE_BLINK);
+        }
+        else if (key == KEY_ID_4)       /* 2c：返回主菜单，灯必须灭 */
+        {
+            Led_SetMode(LED_MODE_OFF);
+            s_page = PAGE_MAIN;
+        }
+        break;
+
+    default:                            /* 其它子界面：按键4 返回 */
+        if (key == KEY_ID_4)
+        {
+            s_page = PAGE_MAIN;
+        }
+        break;
+    }
+}
+
+/* ---------------- 对外接口 ---------------- */
+
+void Menu_Init(void)
+{
+    s_page      = PAGE_MAIN;
+    s_cursor    = 0;
+    s_dirty     = 1;
+    s_draw_tick = HAL_GetTick();
+}
+
+void Menu_Task(void)
+{
+    uint32_t now = HAL_GetTick();
+    uint8_t  key = Key_Scan();
+
+    if (key != KEY_ID_NONE)
+    {
+        handle_key(key);
+        s_dirty = 1;                    /* 状态变了，立刻重画 */
+    }
+
+    if ((s_dirty != 0) || ((now - s_draw_tick) >= MENU_REFRESH_MS))
+    {
+        s_draw_tick = now;
+        s_dirty     = 0;
+        draw_page();
+    }
+}

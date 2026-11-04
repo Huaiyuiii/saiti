@@ -1,0 +1,38 @@
+# ---------- Keil MDK 编译产物 ----------
+MDK-ARM/car/
+MDK-ARM/DebugConfig/
+MDK-ARM/RTE/
+MDK-ARM/*.uvguix.*
+MDK-ARM/*.uvoptx
+MDK-ARM/*.bak_*
+MDK-ARM/*.lst
+*.o
+*.d
+*.crf
+*.dep
+*.lnp
+*.axf
+*.hex
+*.map
+*.sct
+*.iex
+*.htm
+*.build_log.htm
+*.tra
+
+# ---------- CMSIS 中本项目用不到的部分（约 62MB） ----------
+# 工程只用到 CMSIS/Include 和 CMSIS/Device/ST/STM32F1xx
+Drivers/CMSIS/Lib/
+Drivers/CMSIS/DSP/
+Drivers/CMSIS/NN/
+Drivers/CMSIS/RTOS/
+Drivers/CMSIS/RTOS2/
+Drivers/CMSIS/Pack/
+Drivers/CMSIS/Documentation/
+
+# ---------- 系统与编辑器 ----------
+Thumbs.db
+desktop.ini
+.DS_Store
+.vscode/
+.idea/
