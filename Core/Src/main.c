@@ -26,6 +26,7 @@
 #include "led.h"
 #include "key.h"
 #include "menu.h"
+#include "track.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -94,6 +95,7 @@ int main(void)
   OLED_Init();          /* 屏幕先亮起来，后面所有界面才有地方显示 */
   Led_Init();           /* 两个 LED 上电先灭 */
   Key_Init();           /* 按键状态清干净 */
+  Track_Init();         /* 8 路循迹探头（PA0~PA7） */
   Menu_Init();          /* 上电进主菜单，箭头在第一行 */
   /* USER CODE END 2 */
 

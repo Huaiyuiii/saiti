@@ -14,6 +14,7 @@
 #include "led.h"
 #include "key.h"
 #include "oled.h"
+#include "track.h"
 
 #define MENU_ITEM_COUNT     4
 
@@ -24,13 +25,6 @@ static const char *const s_item_text[MENU_ITEM_COUNT] =
     "INFO",     /* 对应 PAGE_INFO */
     "LINE",     /* 对应 PAGE_LINE */
     "EXT"       /* 对应 PAGE_EXT  */
-};
-
-/* 8 路传感器都挂在 PA0~PA7，从左到右依次对应 */
-static const uint16_t s_sensor_pin[8] =
-{
-    GPIO_PIN_0, GPIO_PIN_1, GPIO_PIN_2, GPIO_PIN_3,
-    GPIO_PIN_4, GPIO_PIN_5, GPIO_PIN_6, GPIO_PIN_7
 };
 
 static PageId   s_page   = PAGE_MAIN;
@@ -117,19 +111,35 @@ static void draw_info(void)
 
 static void draw_line(void)
 {
-    char bits[9];
+    char    bits[TRACK_CH_COUNT + 1];
+    uint8_t mask = Track_ReadMask();
     uint8_t i;
+    int8_t  err;
 
-    for (i = 0; i < 8; i++)
+    for (i = 0; i < TRACK_CH_COUNT; i++)
     {
-        bits[i] = (HAL_GPIO_ReadPin(GPIOA, s_sensor_pin[i]) == GPIO_PIN_SET) ? '1' : '0';
+        bits[i] = ((mask & (uint8_t)(1u << i)) != 0) ? '1' : '0';
     }
-    bits[8] = '\0';
+    bits[TRACK_CH_COUNT] = '\0';
 
     OLED_Clear();
     OLED_ShowText(0, 0, "SENSOR", 16);
     OLED_ShowText(0, 16, bits, 16);
-    OLED_ShowText(0, 32, "1=WHITE 0=BLACK", 8);
+    OLED_ShowText(0, 32, "1=BLACK 0=WHITE", 8);
+
+    /* 偏差：负数偏左，正数偏右，0 = 正中 */
+    OLED_ShowText(0, 40, "ERR:", 8);
+    if (mask == TRACK_MASK_NONE)
+    {
+        OLED_ShowText(32, 40, "LOST", 8);
+    }
+    else
+    {
+        err = Track_GetError();
+        OLED_ShowText(32, 40, (err < 0) ? "-" : "+", 8);
+        OLED_ShowNum(40, 40, (uint32_t)((err < 0) ? -err : err), 1, 8);
+    }
+
     OLED_ShowText(0, 56, "K4:BACK", 8);
     OLED_Update();
 }
