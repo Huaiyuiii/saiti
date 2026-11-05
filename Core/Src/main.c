@@ -27,6 +27,7 @@
 #include "key.h"
 #include "menu.h"
 #include "track.h"
+#include "beep.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -95,8 +96,10 @@ int main(void)
   OLED_Init();          /* 屏幕先亮起来，后面所有界面才有地方显示 */
   Led_Init();           /* 两个 LED 上电先灭 */
   Key_Init();           /* 按键状态清干净 */
-  Track_Init();         /* 8 路循迹探头（PA0~PA7） */
+  Track_Init();         /* 8 路循迹探头（PB8~PB15，5V 容忍） */
   Menu_Init();          /* 上电进主菜单，箭头在第一行 */
+  Beep_Init();          /* 蜂鸣器先静音 */
+  Beep_Beep(BEEP_BOOT_MS);  /* 上电"嘀"一声，确认蜂鸣器在线 */
   /* USER CODE END 2 */
 
   /* Infinite loop */
@@ -108,6 +111,7 @@ int main(void)
     /* USER CODE BEGIN 3 */
     Led_Task();         /* 非阻塞：在这里维护闪烁相位 */
     Menu_Task();        /* 读按键 + 定时刷新 OLED */
+    Beep_Task();        /* 非阻塞：到点自动关掉蜂鸣器 */
   }
   /* USER CODE END 3 */
 }

@@ -32,10 +32,18 @@
 #define KEY_SCAN_MS             10
 #define KEY_DEBOUNCE_MS         20
 
-/* -------------------- 3. 蜂鸣器（4b 发车提示用，现在先空着）-------------------- */
+/* -------------------- 3. 蜂鸣器（低电平触发模块，带三极管）-------------------- */
 #define BEEP_PORT               GPIOB
 #define BEEP_PIN                GPIO_PIN_5
-#define BEEP_ACTIVE_LOW         1       /* 1 = 低电平响 */
+#define BEEP_ACTIVE_LOW         1       /* 1 = 低电平响（模块丝印"低电触发"） */
+
+/* 上电提示音：响多久（ms）。0 = 上电不响 */
+#define BEEP_BOOT_MS            120
+
+/* 发车提示音：响 3 声，每声 80ms，中间停 120ms */
+#define BEEP_START_COUNT        3
+#define BEEP_START_ON_MS        80
+#define BEEP_START_OFF_MS       120
 
 /* -------------------- 4. OLED -------------------- */
 #define OLED_SCL_PORT           GPIOB

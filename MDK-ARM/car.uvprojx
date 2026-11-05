@@ -415,6 +415,11 @@
               <FilePath>../Core/Src/oled.c</FilePath>
             </File>
             <File>
+              <FileName>beep.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>../Core/Src/beep.c</FilePath>
+            </File>
+            <File>
               <FileName>track.c</FileName>
               <FileType>1</FileType>
               <FilePath>../Core/Src/track.c</FilePath>
