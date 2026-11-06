@@ -18,7 +18,32 @@
 #include "menu.h"
 #include <string.h>
 
-UART_HandleTypeDef huart1;
+/* ---------------- 端口选择 ----------------
+ * 只改 app_config.h 里的 USART_PORT_SEL，这里自动跟着变。
+ * 引脚、时钟、中断向量名全在这一段里，别的地方不用关心用的是哪个串口。 */
+#if (USART_PORT_SEL == 2)
+
+#define USART_INST              USART2
+#define USART_IRQn_USE          USART2_IRQn
+#define USART_CLK_ENABLE()      __HAL_RCC_USART2_CLK_ENABLE()
+#define USART_TX_PORT           GPIOA
+#define USART_TX_PIN            GPIO_PIN_2
+#define USART_RX_PORT           GPIOA
+#define USART_RX_PIN            GPIO_PIN_3
+
+#else
+
+#define USART_INST              USART1
+#define USART_IRQn_USE          USART1_IRQn
+#define USART_CLK_ENABLE()      __HAL_RCC_USART1_CLK_ENABLE()
+#define USART_TX_PORT           GPIOA
+#define USART_TX_PIN            GPIO_PIN_9
+#define USART_RX_PORT           GPIOA
+#define USART_RX_PIN            GPIO_PIN_10
+
+#endif
+
+UART_HandleTypeDef huart_com;
 
 /* ---------------- 接收缓冲 ---------------- */
 
@@ -181,45 +206,44 @@ static void usart_handle_line(char *line)
 /* ---------------- 初始化 ---------------- */
 
 /* HAL 在 HAL_UART_Init() 内部回调这个函数，用来配引脚和中断。
- * 放在这里而不是 stm32f1xx_hal_msp.c，是为了让串口相关的东西都集中在一个文件。
- * 以后加 USART2 接蓝牙时，在这里按 huart->Instance 分支加就行 */
+ * 放在这里而不是 stm32f1xx_hal_msp.c，是为了让串口相关的东西都集中在一个文件。 */
 void HAL_UART_MspInit(UART_HandleTypeDef *huart)
 {
     GPIO_InitTypeDef gi = {0};
 
-    if (huart->Instance != USART1) return;
+    if (huart->Instance != USART_INST) return;
 
-    __HAL_RCC_USART1_CLK_ENABLE();
+    USART_CLK_ENABLE();
     __HAL_RCC_GPIOA_CLK_ENABLE();
 
-    /* PA9 = TX，复用推挽输出 */
-    gi.Pin   = GPIO_PIN_9;
+    /* TX：复用推挽输出 */
+    gi.Pin   = USART_TX_PIN;
     gi.Mode  = GPIO_MODE_AF_PP;
     gi.Speed = GPIO_SPEED_FREQ_HIGH;
-    HAL_GPIO_Init(GPIOA, &gi);
+    HAL_GPIO_Init(USART_TX_PORT, &gi);
 
-    /* PA10 = RX，浮空输入（内部上拉会和模块输出打架，这里用浮空） */
-    gi.Pin  = GPIO_PIN_10;
+    /* RX：浮空输入（内部上拉会和模块输出打架，这里用浮空） */
+    gi.Pin  = USART_RX_PIN;
     gi.Mode = GPIO_MODE_INPUT;
     gi.Pull = GPIO_NOPULL;
-    HAL_GPIO_Init(GPIOA, &gi);
+    HAL_GPIO_Init(USART_RX_PORT, &gi);
 
-    HAL_NVIC_SetPriority(USART1_IRQn, 1, 0);
-    HAL_NVIC_EnableIRQ(USART1_IRQn);
+    HAL_NVIC_SetPriority(USART_IRQn_USE, 1, 0);
+    HAL_NVIC_EnableIRQ(USART_IRQn_USE);
 }
 
 void Usart_Init(void)
 {
-    huart1.Instance          = USART1;
-    huart1.Init.BaudRate     = USART_BAUDRATE;
-    huart1.Init.WordLength   = UART_WORDLENGTH_8B;
-    huart1.Init.StopBits     = UART_STOPBITS_1;
-    huart1.Init.Parity       = UART_PARITY_NONE;
-    huart1.Init.Mode         = UART_MODE_TX_RX;
-    huart1.Init.HwFlowCtl    = UART_HWCONTROL_NONE;
-    huart1.Init.OverSampling = UART_OVERSAMPLING_16;
+    huart_com.Instance          = USART_INST;
+    huart_com.Init.BaudRate     = USART_BAUDRATE;
+    huart_com.Init.WordLength   = UART_WORDLENGTH_8B;
+    huart_com.Init.StopBits     = UART_STOPBITS_1;
+    huart_com.Init.Parity       = UART_PARITY_NONE;
+    huart_com.Init.Mode         = UART_MODE_TX_RX;
+    huart_com.Init.HwFlowCtl    = UART_HWCONTROL_NONE;
+    huart_com.Init.OverSampling = UART_OVERSAMPLING_16;
 
-    if (HAL_UART_Init(&huart1) != HAL_OK)
+    if (HAL_UART_Init(&huart_com) != HAL_OK)
     {
         Error_Handler();
     }
@@ -229,9 +253,21 @@ void Usart_Init(void)
     s_rx_tick  = HAL_GetTick();
 
     /* 开中断接收，从此每来一个字节进一次 HAL_UART_RxCpltCallback */
-    HAL_UART_Receive_IT(&huart1, &s_rx_byte, 1);
+    HAL_UART_Receive_IT(&huart_com, &s_rx_byte, 1);
 
     Usart_SendLine("READY");
+}
+
+/* ---------------- 中断入口 ----------------
+ * 函数名必须和启动文件里的向量表对上，所以这里要跟着 USART_PORT_SEL 变。
+ * 放在 usart.c 而不是 stm32f1xx_it.c，是因为换串口时只改这一个文件就够了。 */
+#if (USART_PORT_SEL == 2)
+void USART2_IRQHandler(void)
+#else
+void USART1_IRQHandler(void)
+#endif
+{
+    HAL_UART_IRQHandler(&huart_com);
 }
 
 /* ---------------- 接收中断 ---------------- */
@@ -240,7 +276,7 @@ void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
 {
     uint8_t b;
 
-    if (huart->Instance != USART1) return;
+    if (huart->Instance != USART_INST) return;
 
     b          = s_rx_byte;
     s_rx_tick  = HAL_GetTick();
@@ -266,7 +302,7 @@ void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
         s_rx_len = 0;                   /* 太长，丢掉重来 */
     }
 
-    HAL_UART_Receive_IT(&huart1, &s_rx_byte, 1);
+    HAL_UART_Receive_IT(&huart_com, &s_rx_byte, 1);
 }
 
 /* ---------------- 发送 ---------------- */
@@ -275,7 +311,7 @@ void Usart_SendString(const char *s)
 {
     uint16_t len = (uint16_t)strlen(s);
     if (len == 0) return;
-    HAL_UART_Transmit(&huart1, (const uint8_t *)s, len, USART_TX_TIMEOUT_MS);
+    HAL_UART_Transmit(&huart_com, (const uint8_t *)s, len, USART_TX_TIMEOUT_MS);
 }
 
 void Usart_SendLine(const char *s)

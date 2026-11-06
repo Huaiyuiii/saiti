@@ -3,11 +3,13 @@
 
 #include "main.h"
 
-/* USART1：PA9 = TX，PA10 = RX
+/* 上位机通信口。具体用 USART1（PA9/PA10）还是 USART2（PA2/PA3）
+ * 由 app_config.h 里的 USART_PORT_SEL 决定，这里不用管。
+ *
  * 基础部分 3b / 3c 用 USB-TTL 接电脑（上位机）
- * 拓展 6.3 蓝牙也可以先挂这里试，两个不要同时插 */
+ * 拓展 6.3 蓝牙也可以挂这里，两个不要同时插 */
 
-extern UART_HandleTypeDef huart1;
+extern UART_HandleTypeDef huart_com;
 
 void Usart_Init(void);
 void Usart_Task(void);                          /* 主循环里调，解析收到的命令 */
