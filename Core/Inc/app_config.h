@@ -145,6 +145,15 @@
 /* 默认直行速度（循迹用）。0~1000，600 大约是中等偏快 */
 #define MOTOR_BASE_SPEED        600
 
+/* ---- 上电自测：验证接线用，测通后改回 0 ---- */
+/* 1 = 上电后等 3 秒，两轮正转 2 秒，然后停
+ * 0 = 正常模式，上电不转
+ * ⚠️ 测试时必须把车架空，否则会直接窜出去 */
+#define MOTOR_SELFTEST          1
+#define MOTOR_SELFTEST_WAIT_MS  3000    /* 上电等多久再转，留时间松手 */
+#define MOTOR_SELFTEST_RUN_MS   2000    /* 转多久 */
+#define MOTOR_SELFTEST_SPEED    400     /* 测试速度，400 够看清转向又不至于太快 */
+
 /* -------------------- 7. 个人信息（3a 要显示，改成你自己的）-------------------- */
 /* ⚠️ 把下面一串 0 换成你的真学号，否则 3a 那 1 分拿不到 */
 #define INFO_NAME               "ZHANGTIANYU"

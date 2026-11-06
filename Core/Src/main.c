@@ -104,6 +104,16 @@ int main(void)
   Beep_Beep(BEEP_BOOT_MS);  /* 上电"嘀"一声，确认蜂鸣器在线 */
   Usart_Init();         /* USART1：PA9=TX / PA10=RX，上电会发 "READY" */
   Motor_Init();         /* TB6612：TIM3 双路 PWM 20kHz，上电两轮滑行不转 */
+
+#if MOTOR_SELFTEST
+  /* 接线自测：等 3 秒 → 两轮正转 2 秒 → 停
+   * 测通后把 app_config.h 里的 MOTOR_SELFTEST 改回 0 */
+  HAL_Delay(MOTOR_SELFTEST_WAIT_MS);
+  Motor_Set(MOTOR_SELFTEST_SPEED, MOTOR_SELFTEST_SPEED);
+  HAL_Delay(MOTOR_SELFTEST_RUN_MS);
+  Motor_Stop();
+#endif
+
   /* USER CODE END 2 */
 
   /* Infinite loop */
