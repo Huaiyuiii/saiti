@@ -106,12 +106,20 @@ int main(void)
   Motor_Init();         /* TB6612：TIM3 双路 PWM 20kHz，上电两轮滑行不转 */
 
 #if MOTOR_SELFTEST
-  /* 接线自测：等 3 秒 → 两轮正转 2 秒 → 停
+  /* 接线自测：等 3 秒 → 软启动到目标速度 → 保持 2 秒 → 停
+   * 用软启动而不是直接给满，是为了压住启动冲击电流。
    * 测通后把 app_config.h 里的 MOTOR_SELFTEST 改回 0 */
-  HAL_Delay(MOTOR_SELFTEST_WAIT_MS);
-  Motor_Set(MOTOR_SELFTEST_SPEED, MOTOR_SELFTEST_SPEED);
-  HAL_Delay(MOTOR_SELFTEST_RUN_MS);
-  Motor_Stop();
+  {
+    uint16_t i;
+    HAL_Delay(MOTOR_SELFTEST_WAIT_MS);
+    Motor_SetRamp(MOTOR_SELFTEST_SPEED, MOTOR_SELFTEST_SPEED, MOTOR_SELFTEST_RAMP_MS);
+    for (i = 0; i < (uint16_t)(MOTOR_SELFTEST_RUN_MS / MOTOR_RAMP_TICK_MS); i++)
+    {
+      Motor_Task();
+      HAL_Delay(MOTOR_RAMP_TICK_MS);
+    }
+    Motor_Stop();
+  }
 #endif
 
   /* USER CODE END 2 */
@@ -127,6 +135,7 @@ int main(void)
     Menu_Task();        /* 读按键 + 定时刷新 OLED */
     Beep_Task();        /* 非阻塞：到点自动关掉蜂鸣器 */
     Usart_Task();       /* 非阻塞：解析上位机命令 */
+    Motor_Task();       /* 非阻塞：推进软启动斜坡 */
   }
   /* USER CODE END 3 */
 }

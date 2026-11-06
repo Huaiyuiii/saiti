@@ -20,6 +20,16 @@ static TIM_HandleTypeDef s_htim3;
 static int16_t s_left  = 0;
 static int16_t s_right = 0;
 
+/* ---------------- 软启动状态 ---------------- */
+static int16_t  s_cur_l     = 0;    /* 当前实际输出 */
+static int16_t  s_cur_r     = 0;
+static int16_t  s_tgt_l     = 0;    /* 斜坡终点 */
+static int16_t  s_tgt_r     = 0;
+static int16_t  s_step_l    = 0;    /* 每步增量 */
+static int16_t  s_step_r    = 0;
+static uint16_t s_steps     = 0;    /* 还剩几步，0 = 没有斜坡任务 */
+static uint32_t s_ramp_tick = 0;
+
 /* ---------------- 方向脚 ---------------- */
 
 static void motor_dir_gpio_init(void)
@@ -177,8 +187,65 @@ void Motor_Set(int16_t left, int16_t right)
     s_left  = left;
     s_right = right;
 
+    /* 直接设速度会打断正在进行的斜坡，状态全部对齐到新值 */
+    s_cur_l = left;
+    s_cur_r = right;
+    s_tgt_l = left;
+    s_tgt_r = right;
+    s_steps = 0;
+
     motor_drive_one(0, left);
     motor_drive_one(1, right);
+}
+
+void Motor_SetRamp(int16_t left, int16_t right, uint16_t ramp_ms)
+{
+    uint16_t n = (uint16_t)(ramp_ms / MOTOR_RAMP_TICK_MS);
+    int16_t  dl, dr;
+
+    if (n == 0)                      /* 时间太短，退化成直接设置 */
+    {
+        Motor_Set(left, right);
+        return;
+    }
+
+    s_tgt_l = left;
+    s_tgt_r = right;
+
+    /* 增量用整除会有累积误差，最后一步直接对齐目标值补掉 */
+    dl = (int16_t)(left  - s_cur_l);
+    dr = (int16_t)(right - s_cur_r);
+    s_step_l = (int16_t)(dl / (int16_t)n);
+    s_step_r = (int16_t)(dr / (int16_t)n);
+
+    s_steps     = n;
+    s_ramp_tick = HAL_GetTick();
+}
+
+void Motor_Task(void)
+{
+    if (s_steps == 0) return;
+    if ((uint32_t)(HAL_GetTick() - s_ramp_tick) < MOTOR_RAMP_TICK_MS) return;
+
+    s_ramp_tick += MOTOR_RAMP_TICK_MS;
+    s_steps--;
+
+    if (s_steps == 0)                /* 最后一步直接落到目标值，消除累积误差 */
+    {
+        s_cur_l = s_tgt_l;
+        s_cur_r = s_tgt_r;
+    }
+    else
+    {
+        s_cur_l = (int16_t)(s_cur_l + s_step_l);
+        s_cur_r = (int16_t)(s_cur_r + s_step_r);
+    }
+
+    s_left  = s_cur_l;
+    s_right = s_cur_r;
+
+    motor_drive_one(0, s_cur_l);
+    motor_drive_one(1, s_cur_r);
 }
 
 void Motor_Stop(void)
@@ -200,6 +267,11 @@ void Motor_Brake(void)
 
     s_left  = 0;
     s_right = 0;
+    s_cur_l = 0;
+    s_cur_r = 0;
+    s_tgt_l = 0;
+    s_tgt_r = 0;
+    s_steps = 0;            /* 刹车要立刻生效，取消任何进行中的斜坡 */
 }
 
 void Motor_GetSpeed(int16_t *left, int16_t *right)

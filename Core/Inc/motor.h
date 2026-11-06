@@ -28,4 +28,12 @@ void Motor_Brake(void);
 /* 读回当前设定的速度，调试和显示用 */
 void Motor_GetSpeed(int16_t *left, int16_t *right);
 
+/* 软启动：在 ramp_ms 毫秒内，从当前速度平滑过渡到目标速度。
+ * 调用后立即返回，实际过渡由 Motor_Task() 在后台推进。
+ * 用途：压住启动瞬间的冲击电流，避免电源被拉垮导致单片机复位 */
+void Motor_SetRamp(int16_t left, int16_t right, uint16_t ramp_ms);
+
+/* 主循环里调用，推进软启动过程。没有斜坡任务时立即返回，开销可忽略 */
+void Motor_Task(void);
+
 #endif /* __MOTOR_H */
