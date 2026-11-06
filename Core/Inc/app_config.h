@@ -85,4 +85,23 @@
 #define INFO_NAME               "ZHANGTIANYU"
 #define INFO_STUDENT_ID         "32602237"
 
+/* -------------------- 7. 串口 USART1（3b / 3c 上位机通信）-------------------- */
+/* PA9 = TX，PA10 = RX，两个都是 FT（5V 容忍），接 CH340 这类 5V 电平的
+ * USB-TTL 也不会打穿。 */
+#define USART_BAUDRATE          115200      /* 串口助手上的波特率必须和这里一致 */
+
+/* 一帧最多收多少字节。"GET A" 才 5 个字节，64 已经很宽松 */
+#define USART_RX_BUF_SIZE       64
+
+/* 对方不发换行时，静默多少毫秒就把已有内容当成一帧。
+ * 改小 → 反应快，但发送慢的设备可能被截断；改大 → 更宽容但延迟高 */
+#define USART_FRAME_IDLE_MS     50
+
+/* 发送一帧的超时保护（ms）。115200 下发 64 字节约 6ms */
+#define USART_TX_TIMEOUT_MS     100
+
+/* 变量 a 的取值范围。屏幕上是 4 位数字，超出就显示不全，所以卡在这里 */
+#define USART_VAR_A_MIN         (-9999)
+#define USART_VAR_A_MAX         (9999)
+
 #endif /* __APP_CONFIG_H */

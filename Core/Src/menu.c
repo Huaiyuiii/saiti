@@ -32,6 +32,9 @@ static uint8_t  s_cursor = 0;           /* 主菜单箭头所在行，上电指�
 static uint32_t s_draw_tick = 0;
 static uint8_t  s_dirty = 1;            /* 1 = 下一轮必须重画 */
 
+/* 变量 a：3a 显示，3b 上位机改，3c 上位机读 */
+static int32_t  s_var_a = 0;
+
 /* ---------------- 文字小工具 ---------------- */
 
 static const char *mode_text(LedMode m)
@@ -103,7 +106,15 @@ static void draw_info(void)
     OLED_ShowText(24, 24, INFO_STUDENT_ID, 8);
 
     OLED_ShowText(0,  32, "A=", 8);
-    OLED_ShowNum(18, 32, 0, 4, 8);      /* 变量 a，初始值 0（3a） */
+    if (s_var_a < 0)                    /* 负数要单独画符号，OLED_ShowNum 只收无符号 */
+    {
+        OLED_ShowText(12, 32, "-", 8);
+        OLED_ShowNum(18, 32, (uint32_t)(-s_var_a), 4, 8);
+    }
+    else
+    {
+        OLED_ShowNum(18, 32, (uint32_t)s_var_a, 4, 8);
+    }
 
     OLED_ShowText(0,  56, "K4:BACK", 8);
     OLED_Update();
@@ -223,6 +234,17 @@ void Menu_Init(void)
     s_cursor    = 0;
     s_dirty     = 1;
     s_draw_tick = HAL_GetTick();
+}
+
+int32_t Menu_GetVarA(void)
+{
+    return s_var_a;
+}
+
+void Menu_SetVarA(int32_t v)
+{
+    s_var_a = v;
+    s_dirty = 1;                        /* 值变了，下一轮立刻重画，不用等 100ms */
 }
 
 void Menu_Task(void)

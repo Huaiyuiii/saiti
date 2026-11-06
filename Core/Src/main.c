@@ -28,6 +28,7 @@
 #include "menu.h"
 #include "track.h"
 #include "beep.h"
+#include "usart.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -100,6 +101,7 @@ int main(void)
   Menu_Init();          /* 上电进主菜单，箭头在第一行 */
   Beep_Init();          /* 蜂鸣器先静音 */
   Beep_Beep(BEEP_BOOT_MS);  /* 上电"嘀"一声，确认蜂鸣器在线 */
+  Usart_Init();         /* USART1：PA9=TX / PA10=RX，上电会发 "READY" */
   /* USER CODE END 2 */
 
   /* Infinite loop */
@@ -112,6 +114,7 @@ int main(void)
     Led_Task();         /* 非阻塞：在这里维护闪烁相位 */
     Menu_Task();        /* 读按键 + 定时刷新 OLED */
     Beep_Task();        /* 非阻塞：到点自动关掉蜂鸣器 */
+    Usart_Task();       /* 非阻塞：解析上位机命令 */
   }
   /* USER CODE END 3 */
 }
