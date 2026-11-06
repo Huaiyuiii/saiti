@@ -95,6 +95,7 @@ int main(void)
   /* Initialize all configured peripherals */
   MX_GPIO_Init();
   /* USER CODE BEGIN 2 */
+  Motor_Init();         /* 必须第一个做：立刻把方向脚拉低，否则上电瞬间右轮会乱转 */
   OLED_Init();          /* 屏幕先亮起来，后面所有界面才有地方显示 */
   Led_Init();           /* 两个 LED 上电先灭 */
   Key_Init();           /* 按键状态清干净 */
@@ -103,7 +104,6 @@ int main(void)
   Beep_Init();          /* 蜂鸣器先静音 */
   Beep_Beep(BEEP_BOOT_MS);  /* 上电"嘀"一声，确认蜂鸣器在线 */
   Usart_Init();         /* USART1：PA9=TX / PA10=RX，上电会发 "READY" */
-  Motor_Init();         /* TB6612：TIM3 双路 PWM 20kHz，上电两轮滑行不转 */
 
 #if MOTOR_SELFTEST
   /* 接线自测：等 3 秒 → 软启动到目标速度 → 保持 2 秒 → 停
