@@ -29,6 +29,7 @@
 #include "track.h"
 #include "beep.h"
 #include "usart.h"
+#include "motor.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -102,6 +103,7 @@ int main(void)
   Beep_Init();          /* 蜂鸣器先静音 */
   Beep_Beep(BEEP_BOOT_MS);  /* 上电"嘀"一声，确认蜂鸣器在线 */
   Usart_Init();         /* USART1：PA9=TX / PA10=RX，上电会发 "READY" */
+  Motor_Init();         /* TB6612：TIM3 双路 PWM 20kHz，上电两轮滑行不转 */
   /* USER CODE END 2 */
 
   /* Infinite loop */

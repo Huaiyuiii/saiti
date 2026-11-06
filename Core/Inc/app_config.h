@@ -90,12 +90,67 @@
  * 把这个改成 1 即可，不用重新接线 */
 #define TRACK_REVERSE           0
 
-/* -------------------- 6. 个人信息（3a 要显示，改成你自己的）-------------------- */
+/* -------------------- 6. 电机（TB6612FNG 双路驱动）-------------------- */
+/* TB6612 每路电机要 3 根线：PWM（调速）+ IN1/IN2（定方向）。
+ * 两路共 6 根，加 STBY 待机脚。
+ *
+ * 为什么 PWM 必须放 PA6 / PA7：
+ *   这两个脚是 TIM3 的 CH1 / CH2 默认通道，不用重映射就能出硬件 PWM。
+ *   换到别的脚就只能软件模拟 PWM，主循环会被占满，屏幕和按键全卡。
+ *
+ * 方向脚随便挑，但要避开已占用的：
+ *   PA0/PA1/PA4/PA5 按键，PA2/PA3 蓝牙，PA9/PA10 串口，
+ *   PA13/PA14 下载口，PB3~PB15 灯/蜂鸣器/OLED/循迹。
+ * 所以只剩 PA8、PA11、PA12、PB0、PB1、PB2、PA15。
+ *   - PA15 是 JTAG 的 JTDI，做输出不可靠，排除
+ *   - PB2 是 BOOT1，上电瞬间被采样，排除
+ * 最后取 PA8 / PA11 / PA12 / PB0。 */
+#define MOTOR_PWM_PORT          GPIOA
+
+#define MOTOR_PWMA_PIN          GPIO_PIN_6      /* TIM3_CH1 */
+#define MOTOR_PWMB_PIN          GPIO_PIN_7      /* TIM3_CH2 */
+
+#define MOTOR_AIN1_PORT         GPIOA
+#define MOTOR_AIN1_PIN          GPIO_PIN_8
+#define MOTOR_AIN2_PORT         GPIOA
+#define MOTOR_AIN2_PIN          GPIO_PIN_11
+
+#define MOTOR_BIN1_PORT         GPIOA
+#define MOTOR_BIN1_PIN          GPIO_PIN_12
+#define MOTOR_BIN2_PORT         GPIOB
+#define MOTOR_BIN2_PIN          GPIO_PIN_0
+
+/* STBY 待机脚：低电平芯片关断，电机自由滑行。
+ * 现在直接接 3.3V（常使能），代码里不管它。
+ * 如果以后想软件急停，把它挪到 PB1，再把下面改成 1 */
+#define MOTOR_USE_STBY_PIN      0
+#define MOTOR_STBY_PORT         GPIOB
+#define MOTOR_STBY_PIN          GPIO_PIN_1
+
+/* PWM 频率 = 72MHz / (ARR + 1) = 72MHz / 3600 = 20kHz
+ * 20kHz 在人耳听觉上限之外，电机不会发出"滋滋"啸叫。
+ * 改成 10kHz 也能用，但会听到轻微的高频噪音 */
+#define MOTOR_PWM_ARR           3599
+
+/* 速度满量程。Motor_Set 的参数范围是 -1000 ~ +1000，
+ * 符号表示方向，绝对值表示占空比（1000 = 100%） */
+#define MOTOR_FULL_SCALE        1000
+
+/* 死区补偿：TB6612 在占空比很低时电机不转，只有"嗡嗡"声还发热。
+ * 实测一般 15%~20% 才起转，这里给 180（18%）。
+ * 效果：只要给了非零速度，就至少输出 180，越过死区。
+ * 如果发现低速时车"窜一下"，把这个调小；如果低速干脆不动，调大 */
+#define MOTOR_DEADZONE          180
+
+/* 默认直行速度（循迹用）。0~1000，600 大约是中等偏快 */
+#define MOTOR_BASE_SPEED        600
+
+/* -------------------- 7. 个人信息（3a 要显示，改成你自己的）-------------------- */
 /* ⚠️ 把下面一串 0 换成你的真学号，否则 3a 那 1 分拿不到 */
 #define INFO_NAME               "ZHANGTIANYU"
 #define INFO_STUDENT_ID         "32602237"
 
-/* -------------------- 7. 串口（3b / 3c 上位机通信）-------------------- */
+/* -------------------- 8. 串口（3b / 3c 上位机通信）-------------------- */
 /* 用哪个串口：
  *   1 = USART1，PA9 = TX，PA10 = RX
  *       两个都是 FT（5V 容忍），5V 的 USB-TTL 可以直接接，不用电阻。
