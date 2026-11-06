@@ -15,6 +15,7 @@
 #include "key.h"
 #include "oled.h"
 #include "track.h"
+#include "line.h"
 
 #define MENU_ITEM_COUNT     4
 
@@ -34,6 +35,9 @@ static uint8_t  s_dirty = 1;            /* 1 = 下一轮必须重画 */
 
 /* 变量 a：3a 显示，3b 上位机改，3c 上位机读 */
 static int32_t  s_var_a = 0;
+
+/* LINE 页面选定的圈数：1 = 4b，2 = 4c */
+static uint8_t  s_laps_sel = LINE_DEFAULT_LAPS;
 
 /* ---------------- 文字小工具 ---------------- */
 
@@ -120,13 +124,86 @@ static void draw_info(void)
     OLED_Update();
 }
 
+/* 在 (x,y) 处画 "秒.两位小数S"，例如 "12.34S"
+ * 16px 字体每字符 8px 宽，8px 字体每字符 6px 宽，按 size 自动算位置 */
+static void draw_time(uint8_t x, uint8_t y, uint32_t ms, uint8_t size)
+{
+    uint32_t sec  = ms / 1000u;
+    uint32_t cent = (ms % 1000u) / 10u;
+    uint8_t  w    = (size >= 16) ? 8 : 6;
+
+    OLED_ShowNum(x, y, sec, 2, size);
+    OLED_ShowText((uint8_t)(x + 2 * w), y, ".", size);
+
+    if (cent < 10u)                     /* 补前导零，否则 5 会显示成 " 5" */
+    {
+        OLED_ShowText((uint8_t)(x + 3 * w), y, "0", size);
+        OLED_ShowNum((uint8_t)(x + 4 * w), y, cent, 1, size);
+    }
+    else
+    {
+        OLED_ShowNum((uint8_t)(x + 3 * w), y, cent, 2, size);
+    }
+
+    OLED_ShowText((uint8_t)(x + 5 * w), y, "S", size);
+}
+
 static void draw_line(void)
 {
-    char    bits[TRACK_CH_COUNT + 1];
-    uint8_t mask = Track_ReadMask();
-    uint8_t i;
-    int8_t  err;
+    LineState st = Line_GetState();
+    char      bits[TRACK_CH_COUNT + 1];
+    uint8_t   mask;
+    uint8_t   i;
+    int8_t    err;
 
+    /* ---------- 正在跑：只显示成绩相关的信息 ---------- */
+    if (st == LINE_RUNNING)
+    {
+        OLED_Clear();
+        OLED_ShowText(0, 0, "RUN  ", 16);
+        OLED_ShowNum(40, 0, Line_GetLapDone() + 1, 1, 16);
+        OLED_ShowText(48, 0, "/", 16);
+        OLED_ShowNum(56, 0, Line_GetLapTarget(), 1, 16);
+
+        draw_time(16, 20, Line_GetElapsedMs(), 16);
+
+        OLED_ShowText(0, 40, "ERR:", 8);
+        err = Line_GetError();
+        OLED_ShowText(24, 40, (err < 0) ? "-" : "+", 8);
+        OLED_ShowNum(30, 40, (uint32_t)((err < 0) ? -err : err), 1, 8);
+
+        OLED_ShowText(48, 40, "M:", 8);
+        mask = Line_GetMask();
+        for (i = 0; i < TRACK_CH_COUNT; i++)
+        {
+            OLED_ShowText((uint8_t)(60 + i * 6), 40,
+                          ((mask & (uint8_t)(1u << i)) != 0) ? "1" : "0", 8);
+        }
+
+        OLED_ShowText(0, 56, "K4:STOP", 8);
+        OLED_Update();
+        return;
+    }
+
+    /* ---------- 跑完了：定格成绩 ---------- */
+    if (st == LINE_DONE)
+    {
+        OLED_Clear();
+        OLED_ShowText(0, 0, "DONE", 16);
+        draw_time(16, 20, Line_GetElapsedMs(), 16);
+
+        OLED_ShowText(0, 40, "LAP ", 8);
+        OLED_ShowNum(24, 40, Line_GetLapDone(), 1, 8);
+        OLED_ShowText(30, 40, "/", 8);
+        OLED_ShowNum(36, 40, Line_GetLapTarget(), 1, 8);
+
+        OLED_ShowText(0, 52, "K3:AGAIN K4:BACK", 8);
+        OLED_Update();
+        return;
+    }
+
+    /* ---------- 待机：4a 传感器显示 + 发车提示 ---------- */
+    mask = Track_ReadMask();
     for (i = 0; i < TRACK_CH_COUNT; i++)
     {
         bits[i] = ((mask & (uint8_t)(1u << i)) != 0) ? '1' : '0';
@@ -136,21 +213,23 @@ static void draw_line(void)
     OLED_Clear();
     OLED_ShowText(0, 0, "SENSOR", 16);
     OLED_ShowText(0, 16, bits, 16);
-    OLED_ShowText(0, 32, "1=BLACK 0=WHITE", 8);
 
-    /* 偏差：负数偏左，正数偏右，0 = 正中 */
-    OLED_ShowText(0, 40, "ERR:", 8);
+    OLED_ShowText(0, 36, "ERR:", 8);
     if (mask == TRACK_MASK_NONE)
     {
-        OLED_ShowText(32, 40, "LOST", 8);
+        OLED_ShowText(24, 36, "LOST", 8);
     }
     else
     {
         err = Track_GetError();
-        OLED_ShowText(32, 40, (err < 0) ? "-" : "+", 8);
-        OLED_ShowNum(40, 40, (uint32_t)((err < 0) ? -err : err), 1, 8);
+        OLED_ShowText(24, 36, (err < 0) ? "-" : "+", 8);
+        OLED_ShowNum(30, 36, (uint32_t)((err < 0) ? -err : err), 1, 8);
     }
 
+    OLED_ShowText(48, 36, "LAP:", 8);
+    OLED_ShowNum(72, 36, s_laps_sel, 1, 8);
+
+    OLED_ShowText(0, 48, "K3:START K1:LAP", 8);
     OLED_ShowText(0, 56, "K4:BACK", 8);
     OLED_Update();
 }
@@ -217,6 +296,48 @@ static void handle_key(uint8_t key)
         }
         break;
 
+    case PAGE_LINE:
+    {
+        LineState st = Line_GetState();
+
+        if (st == LINE_RUNNING)
+        {
+            if (key == KEY_ID_4)            /* 跑动中：K4 手动停车 */
+            {
+                Line_Stop();
+            }
+        }
+        else if (st == LINE_DONE)
+        {
+            if (key == KEY_ID_3)            /* 再来一次 */
+            {
+                Line_Start(s_laps_sel);
+            }
+            else if (key == KEY_ID_4)       /* 返回主菜单，同时清掉成绩 */
+            {
+                Line_Stop();
+                Line_Init();
+                s_page = PAGE_MAIN;
+            }
+        }
+        else                                /* LINE_IDLE */
+        {
+            if (key == KEY_ID_3)            /* 4b/4c：发车 */
+            {
+                Line_Start(s_laps_sel);
+            }
+            else if (key == KEY_ID_1)       /* 切换 1 圈 / 2 圈 */
+            {
+                s_laps_sel = (s_laps_sel == 1) ? 2 : 1;
+            }
+            else if (key == KEY_ID_4)
+            {
+                s_page = PAGE_MAIN;
+            }
+        }
+        break;
+    }
+
     default:                            /* 其它子界面：按键4 返回 */
         if (key == KEY_ID_4)
         {
@@ -234,6 +355,7 @@ void Menu_Init(void)
     s_cursor    = 0;
     s_dirty     = 1;
     s_draw_tick = HAL_GetTick();
+    s_laps_sel  = LINE_DEFAULT_LAPS;
 }
 
 int32_t Menu_GetVarA(void)

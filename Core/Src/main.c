@@ -30,6 +30,7 @@
 #include "beep.h"
 #include "usart.h"
 #include "motor.h"
+#include "line.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -100,6 +101,7 @@ int main(void)
   Led_Init();           /* 两个 LED 上电先灭 */
   Key_Init();           /* 按键状态清干净 */
   Track_Init();         /* 8 路循迹探头（PB8~PB15，5V 容忍） */
+  Line_Init();          /* 循迹闭环状态清零 */
   Menu_Init();          /* 上电进主菜单，箭头在第一行 */
   Beep_Init();          /* 蜂鸣器先静音 */
   Beep_Beep(BEEP_BOOT_MS);  /* 上电"嘀"一声，确认蜂鸣器在线 */
@@ -136,6 +138,7 @@ int main(void)
     Beep_Task();        /* 非阻塞：到点自动关掉蜂鸣器 */
     Usart_Task();       /* 非阻塞：解析上位机命令 */
     Motor_Task();       /* 非阻塞：推进软启动斜坡 */
+    Line_Task();        /* 非阻塞：循迹闭环，10ms 一次 */
   }
   /* USER CODE END 3 */
 }

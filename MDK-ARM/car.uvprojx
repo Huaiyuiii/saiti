@@ -435,6 +435,11 @@
               <FilePath>../Core/Src/motor.c</FilePath>
             </File>
             <File>
+              <FileName>line.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>../Core/Src/line.c</FilePath>
+            </File>
+            <File>
               <FileName>led.c</FileName>
               <FileType>1</FileType>
               <FilePath>../Core/Src/led.c</FilePath>
