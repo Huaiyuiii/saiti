@@ -22,8 +22,18 @@
 #define LED_BLINK_HALF_MS       250
 
 /* -------------------- 2. 按键 -------------------- */
+/* 原来在 PA8 / PA11 / PA12 / PA15，但这 4 个脚和串口 PA9/PA10 挨着，
+ * 杜邦线母头挤在一起插不进去。所以整体挪到 PA 口前半段。
+ *
+ * 选 PA0 / PA1 / PA4 / PA5 的理由：
+ *   - 中间空出 PA2 / PA3，正好留给蓝牙（USART2），互不干扰
+ *   - 按键是无源开关接 GND，只走 3.3V，落在 TTa 脚上完全安全
+ *   - 这 4 个脚不挨着，母头之间有空隙 */
 #define KEY_PORT                GPIOA
 #define KEY_COUNT               4
+
+/* 4 个按键引脚，顺序 = K1 / K2 / K3 / K4 */
+#define KEY_PIN_LIST            { GPIO_PIN_0, GPIO_PIN_1, GPIO_PIN_4, GPIO_PIN_5 }
 
 /* 内部上拉 + 另一端接 GND，所以按下读到低电平 */
 #define KEY_PRESSED_LEVEL       GPIO_PIN_RESET
@@ -97,7 +107,7 @@
  *       PA2（单片机发）输出 3.3V，直接接 USB-TTL 的 RXD 就行，不用处理。
  *
  * 改完这个宏，usart.c 会自动切换引脚、时钟和中断向量，别的地方不用动。 */
-#define USART_PORT_SEL          2
+#define USART_PORT_SEL          1
 
 #define USART_BAUDRATE          115200      /* 串口助手上的波特率必须和这里一致 */
 

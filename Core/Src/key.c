@@ -9,13 +9,7 @@
 #include "app_config.h"
 
 /* 4 个按键的引脚表：顺序必须和 KeyId 对应 */
-static const uint16_t s_key_pin[KEY_COUNT] =
-{
-    GPIO_PIN_8,         /* KEY1 */
-    GPIO_PIN_11,        /* KEY2 */
-    GPIO_PIN_12,        /* KEY3 */
-    GPIO_PIN_15         /* KEY4 */
-};
+static const uint16_t s_key_pin[KEY_COUNT] = KEY_PIN_LIST;
 
 static uint8_t  s_raw[KEY_COUNT];       /* 最近一次采样到的电平：1 = 按下 */
 static uint8_t  s_stable[KEY_COUNT];    /* 消抖之后的稳定状态：1 = 按下 */
@@ -24,7 +18,20 @@ static uint32_t s_scan_tick = 0;
 
 void Key_Init(void)
 {
-    uint8_t i;
+    GPIO_InitTypeDef gi = {0};
+    uint16_t pins = 0;
+    uint8_t  i;
+
+    /* 自己配引脚，不依赖 MX_GPIO_Init 里那批配置，
+     * 以后换脚只改 app_config.h 的 KEY_PIN_LIST 就行 */
+    for (i = 0; i < KEY_COUNT; i++)
+    {
+        pins |= s_key_pin[i];
+    }
+    gi.Pin  = pins;
+    gi.Mode = GPIO_MODE_INPUT;
+    gi.Pull = GPIO_PULLUP;              /* 按键另一头接 GND，没按的时候靠上拉拉高 */
+    HAL_GPIO_Init(KEY_PORT, &gi);
 
     for (i = 0; i < KEY_COUNT; i++)
     {

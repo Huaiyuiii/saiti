@@ -3,14 +3,15 @@
 
 #include "main.h"
 
-/* 按键编号：和赛题里的"按键1/2/3/4"一一对应 */
+/* 按键编号：和赛题里的"按键1/2/3/4"一一对应
+ * 具体引脚见 app_config.h 的 KEY_PIN_LIST（当前 PA0 / PA1 / PA4 / PA5） */
 typedef enum
 {
     KEY_ID_NONE = 0,
-    KEY_ID_1    = 1,        /* PA8  */
-    KEY_ID_2    = 2,        /* PA11 */
-    KEY_ID_3    = 3,        /* PA12 */
-    KEY_ID_4    = 4         /* PA15 */
+    KEY_ID_1    = 1,        /* K1 */
+    KEY_ID_2    = 2,        /* K2 */
+    KEY_ID_3    = 3,        /* K3 */
+    KEY_ID_4    = 4         /* K4 */
 } KeyId;
 
 void    Key_Init(void);
