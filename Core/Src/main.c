@@ -31,6 +31,7 @@
 #include "usart.h"
 #include "motor.h"
 #include "line.h"
+#include "param.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -97,6 +98,7 @@ int main(void)
   MX_GPIO_Init();
   /* USER CODE BEGIN 2 */
   Motor_Init();         /* 必须第一个做：立刻把方向脚拉低，否则上电瞬间右轮会乱转 */
+  Param_Init();         /* 从 Flash 读 KP/KD/速度/圈数，必须在 Menu_Init 之前 */
   OLED_Init();          /* 屏幕先亮起来，后面所有界面才有地方显示 */
   Led_Init();           /* 两个 LED 上电先灭 */
   Key_Init();           /* 按键状态清干净 */

@@ -16,6 +16,8 @@
 #include "oled.h"
 #include "track.h"
 #include "line.h"
+#include "param.h"
+#include "beep.h"
 
 #define MENU_ITEM_COUNT     4
 
@@ -25,7 +27,7 @@ static const char *const s_item_text[MENU_ITEM_COUNT] =
     "LED",      /* 对应 PAGE_LED  */
     "INFO",     /* 对应 PAGE_INFO */
     "LINE",     /* 对应 PAGE_LINE */
-    "EXT"       /* 对应 PAGE_EXT  */
+    "PARAM"     /* 对应 PAGE_EXT：参数设置（6.2 / 6.4） */
 };
 
 static PageId   s_page   = PAGE_MAIN;
@@ -38,6 +40,9 @@ static int32_t  s_var_a = 0;
 
 /* LINE 页面选定的圈数：1 = 4b，2 = 4c */
 static uint8_t  s_laps_sel = LINE_DEFAULT_LAPS;
+
+/* PARAM 页面当前选中的参数项：0=KP 1=KD 2=SPD 3=LAP */
+static uint8_t  s_param_sel = 0;
 
 /* ---------------- 文字小工具 ---------------- */
 
@@ -234,15 +239,58 @@ static void draw_line(void)
     OLED_Update();
 }
 
-static void draw_ext(void)
+/* ---------------- 参数设置页（6.2 保存 / 6.4 调速）---------------- */
+
+static const char *const s_param_name[4] = { "KP ", "KD ", "SPD", "LAP" };
+
+/* 按 K2 时当前项加一步。到上限就绕回下限，这样不用"减"键也能调到任意值 */
+static void param_step_up(void)
 {
+    Param_t *p = Param_Get();
+
+    switch (s_param_sel)
+    {
+    case 0:
+        p->kp = (int16_t)((p->kp >= 200) ? 5 : (p->kp + 5));
+        break;
+    case 1:
+        p->kd = (int16_t)((p->kd >= 100) ? 0 : (p->kd + 2));
+        break;
+    case 2:
+        p->base_speed = (int16_t)((p->base_speed >= MOTOR_FULL_SCALE)
+                                  ? 100 : (p->base_speed + 50));
+        break;
+    default:
+        p->laps = (uint8_t)((p->laps >= 5) ? 1 : (p->laps + 1));
+        break;
+    }
+}
+
+static void draw_param(void)
+{
+    const Param_t *p = Param_Get();
+    uint8_t i;
+
     OLED_Clear();
-    OLED_ShowText(0, 0, "EXT", 16);
-    OLED_ShowText(0, 16, "6.1 RANDOM MAP", 8);
-    OLED_ShowText(0, 24, "6.2 PARAM SAVE", 8);
-    OLED_ShowText(0, 32, "6.3 BLUETOOTH", 8);
-    OLED_ShowText(0, 40, "6.4 SPEED", 8);
-    OLED_ShowText(0, 56, "K4:BACK", 8);
+    OLED_ShowText(0, 0, "PARAM", 16);
+
+    for (i = 0; i < 4; i++)
+    {
+        uint8_t y = (uint8_t)(18 + i * 10);
+
+        OLED_ShowText(0, y, (i == s_param_sel) ? ">" : " ", 8);
+        OLED_ShowText(8, y, s_param_name[i], 8);
+
+        switch (i)
+        {
+        case 0: OLED_ShowNum(32, y, (uint32_t)p->kp,         3, 8); break;
+        case 1: OLED_ShowNum(32, y, (uint32_t)p->kd,         3, 8); break;
+        case 2: OLED_ShowNum(32, y, (uint32_t)p->base_speed, 4, 8); break;
+        default: OLED_ShowNum(32, y, (uint32_t)p->laps,      1, 8); break;
+        }
+    }
+
+    OLED_ShowText(0, 56, "K1:SEL K2:+ K3:SAVE", 8);
     OLED_Update();
 }
 
@@ -253,7 +301,7 @@ static void draw_page(void)
     case PAGE_LED:  draw_led();  break;
     case PAGE_INFO: draw_info(); break;
     case PAGE_LINE: draw_line(); break;
-    case PAGE_EXT:  draw_ext();  break;
+    case PAGE_EXT:  draw_param(); break;
     case PAGE_MAIN:
     default:        draw_main(); break;
     }
@@ -337,6 +385,26 @@ static void handle_key(uint8_t key)
         }
         break;
     }
+
+    case PAGE_EXT:                          /* 参数设置页 */
+        if (key == KEY_ID_1)                /* 切换选中的参数项 */
+        {
+            s_param_sel = (uint8_t)((s_param_sel + 1) % 4);
+        }
+        else if (key == KEY_ID_2)           /* 当前项加一步 */
+        {
+            param_step_up();
+        }
+        else if (key == KEY_ID_3)           /* 6.2：写进 Flash */
+        {
+            Param_Save();
+            Beep_Beep(60);
+        }
+        else if (key == KEY_ID_4)
+        {
+            s_page = PAGE_MAIN;
+        }
+        break;
 
     default:                            /* 其它子界面：按键4 返回 */
         if (key == KEY_ID_4)

@@ -3,6 +3,7 @@
 #include "track.h"
 #include "motor.h"
 #include "beep.h"
+#include "param.h"
 
 /* =====================================================================
  * 循迹闭环
@@ -79,10 +80,14 @@ void Line_Start(uint8_t laps)
 
     /* 软启动：从 0 平滑爬到基准速度，压住启动电流
      * 实际推进由主循环的 Motor_Task() 负责，这里只登记目标 */
-    Motor_SetRamp(MOTOR_BASE_SPEED, MOTOR_BASE_SPEED, LINE_START_RAMP_MS);
+    Motor_SetRamp(Param_Get()->base_speed, Param_Get()->base_speed,
+                  LINE_START_RAMP_MS);
 
     /* 4b：发车提示音 */
-    Beep_BeepN(BEEP_START_COUNT, BEEP_START_ON_MS, BEEP_START_OFF_MS);
+    if (Param_Get()->beep_on)
+    {
+        Beep_BeepN(BEEP_START_COUNT, BEEP_START_ON_MS, BEEP_START_OFF_MS);
+    }
 }
 
 void Line_Stop(void)
@@ -147,13 +152,18 @@ void Line_Task(void)
     /* ---- PD 运算 ---- */
     /* P 项：偏差越大，修正越猛
      * D 项：偏差变化越快，反向修正越强，用来压住直道上的左右摇摆
-     * error 为负表示黑线在左（车偏右），此时左轮减速右轮加速，车左转 */
-    turn = (int32_t)LINE_KP * (int32_t)err
-         + (int32_t)LINE_KD * (int32_t)(err - s_prev_error);
-    s_prev_error = err;
+     * error 为负表示黑线在左（车偏右），此时左轮减速右轮加速，车左转
+     * 系数从 Param 取，现场可以用按键调，不用改代码重烧 */
+    {
+        const Param_t *pp = Param_Get();
 
-    left  = (int32_t)MOTOR_BASE_SPEED + turn;
-    right = (int32_t)MOTOR_BASE_SPEED - turn;
+        turn = (int32_t)pp->kp * (int32_t)err
+             + (int32_t)pp->kd * (int32_t)(err - s_prev_error);
+        s_prev_error = err;
+
+        left  = (int32_t)pp->base_speed + turn;
+        right = (int32_t)pp->base_speed - turn;
+    }
 
     if (left  >  MOTOR_FULL_SCALE) left  =  MOTOR_FULL_SCALE;
     if (left  < -MOTOR_FULL_SCALE) left  = -MOTOR_FULL_SCALE;

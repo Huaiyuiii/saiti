@@ -440,6 +440,11 @@
               <FilePath>../Core/Src/line.c</FilePath>
             </File>
             <File>
+              <FileName>param.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>../Core/Src/param.c</FilePath>
+            </File>
+            <File>
               <FileName>led.c</FileName>
               <FileType>1</FileType>
               <FilePath>../Core/Src/led.c</FilePath>
